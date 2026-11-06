@@ -32,3 +32,12 @@ if(QUIREWISE_BUILD_SHARED AND WIN32)
         quirewise_subtitle
         PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(quirewise_subtitle_fuzz_smoke tests/subtitle_fuzz_smoke.c)
+    target_compile_features(quirewise_subtitle_fuzz_smoke PRIVATE c_std_11)
+    target_link_libraries(quirewise_subtitle_fuzz_smoke PRIVATE Quirewise::Subtitle)
+    add_test(NAME quirewise_subtitle_fuzz_smoke
+        COMMAND quirewise_subtitle_fuzz_smoke)
+endif()
