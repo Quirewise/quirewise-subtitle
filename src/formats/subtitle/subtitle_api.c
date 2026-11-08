@@ -2,7 +2,7 @@
 
 #include "quirewise/status.h"
 #include "subtitle_document.h"
-#include "quirewise/convert.h"
+#include "quirewise/format.h"
 
 #include <stdlib.h>
 #include <string.h>

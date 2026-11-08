@@ -1,7 +1,7 @@
 #ifndef QUIREWISE_WRITER_REGISTRY_INTERNAL_H
 #define QUIREWISE_WRITER_REGISTRY_INTERNAL_H
 
-#include "quirewise/convert.h"
+#include "quirewise/format.h"
 #include "page_document.h"
 #include "architecture_metadata.h"
 #include "audio_document.h"
