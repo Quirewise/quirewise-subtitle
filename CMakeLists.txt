@@ -44,5 +44,10 @@ if(BUILD_TESTING)
     target_link_libraries(quirewise_subtitle_fuzz_smoke PRIVATE Quirewise::Subtitle)
     add_test(NAME quirewise_subtitle_fuzz_smoke
         COMMAND quirewise_subtitle_fuzz_smoke)
+
+    add_executable(quirewise_subtitle_srt_parse tests/srt_parse_test.c)
+    target_compile_features(quirewise_subtitle_srt_parse PRIVATE c_std_11)
+    target_link_libraries(quirewise_subtitle_srt_parse PRIVATE Quirewise::Subtitle)
+    add_test(NAME quirewise_subtitle_srt COMMAND quirewise_subtitle_srt_parse)
 endif()
 target_link_libraries(quirewise_subtitle PUBLIC Quirewise::Runtime)
