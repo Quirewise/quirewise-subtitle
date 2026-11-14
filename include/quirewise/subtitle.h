@@ -27,7 +27,9 @@ typedef enum QwSubtitleInputFormat {
     QW_SUBTITLE_INPUT_SSA,
     QW_SUBTITLE_INPUT_SAMI,
     QW_SUBTITLE_INPUT_MICRODVD,
-    QW_SUBTITLE_INPUT_SCC
+    QW_SUBTITLE_INPUT_SCC,
+    /* Appended for ABI stability: TTML/DXFP timed text. */
+    QW_SUBTITLE_INPUT_TTML = 9
 } QwSubtitleInputFormat;
 
 typedef struct QwSubtitleInfo {

@@ -24,6 +24,9 @@ int qw_subtitle_parse_microdvd_document(const void *input, size_t input_size,
 int qw_subtitle_parse_scc_document(const void *input, size_t input_size,
                                    QwSubtitleDocument *out_document,
                                    QwConvertReport *report);
+int qw_subtitle_parse_ttml_document(const void *input, size_t input_size,
+                                    QwSubtitleDocument *out_document,
+                                    QwConvertReport *report);
 
 struct QwSubtitle {
     QwSubtitleDocument internal;
@@ -42,6 +45,7 @@ static int subtitle_input_format_map(QwSubtitleInputFormat input_format,
     case QW_SUBTITLE_INPUT_SAMI: *out_format = QW_FORMAT_SAMI; return 1;
     case QW_SUBTITLE_INPUT_MICRODVD: *out_format = QW_FORMAT_SUB; return 1;
     case QW_SUBTITLE_INPUT_SCC: *out_format = QW_FORMAT_SCC; return 1;
+    case QW_SUBTITLE_INPUT_TTML: *out_format = QW_FORMAT_TTML; return 1;
     default: return 0;
     }
 }
@@ -101,6 +105,10 @@ QwSubtitleStatus qw_subtitle_parse(const void *data,
         rc = qw_subtitle_parse_scc_document(data, size,
                                             &document->internal, NULL);
         break;
+    case QW_SUBTITLE_INPUT_TTML:
+        rc = qw_subtitle_parse_ttml_document(data, size,
+                                             &document->internal, NULL);
+        break;
     default:
         free(document);
         return QW_SUBTITLE_UNSUPPORTED;
@@ -128,6 +136,7 @@ QwSubtitleStatus qw_subtitle_get_info(const QwSubtitle *document,
     case QW_FORMAT_SAMI: out_info->input_format = QW_SUBTITLE_INPUT_SAMI; break;
     case QW_FORMAT_SUB: out_info->input_format = QW_SUBTITLE_INPUT_MICRODVD; break;
     case QW_FORMAT_SCC: out_info->input_format = QW_SUBTITLE_INPUT_SCC; break;
+    case QW_FORMAT_TTML: out_info->input_format = QW_SUBTITLE_INPUT_TTML; break;
     default: return QW_SUBTITLE_INTERNAL_ERROR;
     }
     out_info->cue_count = document->internal.cue_count;
@@ -167,7 +176,7 @@ const char *qw_subtitle_format_name(QwSubtitleInputFormat input_format)
 {
     static const char *const names[] = {
         "unknown", "srt", "vtt", "lrc", "ass", "ssa", "sami",
-        "microdvd", "scc"
+        "microdvd", "scc", "ttml"
     };
     if ((unsigned)input_format >= sizeof(names) / sizeof(names[0]))
         return "unknown";
