@@ -1,4 +1,8 @@
 #include "subtitle_document.h"
+#include "subtitle_format.h"
+
+#include "../../core/text_buffer.h"
+
 #include "../text/html_entities.h"
 
 #include <stdint.h>
@@ -743,3 +747,117 @@ fail:
     qw_subtitle_document_dispose(out_document);
     return rc;
 }
+/* ------------------------------------------------------------------ */
+/* TTML writer: cue times and text, no styling/regions/metadata.      */
+/* ------------------------------------------------------------------ */
+
+enum { TTML_MAX_OUTPUT_BYTES = 64u * 1024u * 1024u };
+
+static int ttml_write_time(QwTextBuffer *output, uint32_t milliseconds)
+{
+    char buffer[32];
+    uint32_t hours = milliseconds / 3600000u;
+    uint32_t minutes = (milliseconds / 60000u) % 60u;
+    uint32_t seconds = (milliseconds / 1000u) % 60u;
+    uint32_t millis = milliseconds % 1000u;
+    int written = snprintf(buffer, sizeof(buffer), "%02lu:%02lu:%02lu.%03lu",
+                           (unsigned long)hours, (unsigned long)minutes,
+                           (unsigned long)seconds, (unsigned long)millis);
+    if (written <= 0 || (size_t)written >= sizeof(buffer)) return 0;
+    return qw_text_buffer_append(output, buffer, (size_t)written);
+}
+
+static int ttml_write_text(QwTextBuffer *output, const uint8_t *text,
+                           size_t size)
+{
+    size_t index;
+    for (index = 0u; index < size; ++index) {
+        const char *entity = NULL;
+        char value = (char)text[index];
+        if (value == '&') entity = "&amp;";
+        else if (value == '<') entity = "&lt;";
+        else if (value == '>') entity = "&gt;";
+        else if (value == '\r') continue;
+        else if (value == '\n') entity = "<br/>";
+        if (entity) {
+            if (!qw_text_buffer_append(output, entity, strlen(entity)))
+                return 0;
+        } else if (!qw_text_buffer_append(output, &value, 1u)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int ttml_write_document(const QwSubtitleDocument *document,
+                               QwOutputFormat output_format,
+                               const QwConvertOptions *options,
+                               uint8_t **out_data, size_t *out_size,
+                               QwConvertReport *report)
+{
+    QwTextBuffer output = {0};
+    size_t index;
+    int rc = QW_STATUS_OK;
+    (void)options;
+
+    if (!document || !out_data || !out_size ||
+        output_format != QW_FORMAT_TTML ||
+        !qw_subtitle_document_validate(document))
+        return QW_STATUS_ERR_INVALID_ARGUMENT;
+    *out_data = NULL;
+    *out_size = 0u;
+    output.limit = TTML_MAX_OUTPUT_BYTES + 1u;
+    if (!qw_text_buffer_append(&output,
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            "<tt xmlns=\"http://www.w3.org/ns/ttml\" "
+            "xml:lang=\"und\">\n<body>\n<div>\n",
+            strlen("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                   "<tt xmlns=\"http://www.w3.org/ns/ttml\" "
+                   "xml:lang=\"und\">\n<body>\n<div>\n"))) {
+        return QW_STATUS_ERR_OUT_OF_MEMORY;
+    }
+    for (index = 0u; index < document->cue_count; ++index) {
+        const QwSubtitleCue *cue = &document->cues[index];
+        if (!qw_text_buffer_append(&output, "<p begin=\"", 10u) ||
+            !ttml_write_time(&output, cue->start_milliseconds) ||
+            !qw_text_buffer_append(&output, "\" end=\"", 7u) ||
+            !ttml_write_time(&output, cue->end_milliseconds) ||
+            !qw_text_buffer_append(&output, "\">", 2u) ||
+            !ttml_write_text(&output, cue->text_utf8, cue->text_size) ||
+            !qw_text_buffer_append(&output, "</p>\n", 5u)) {
+            rc = output.size >= TTML_MAX_OUTPUT_BYTES
+                     ? QW_STATUS_ERR_RESOURCE_LIMIT
+                     : QW_STATUS_ERR_OUT_OF_MEMORY;
+            goto cleanup;
+        }
+        if (output.size > TTML_MAX_OUTPUT_BYTES) {
+            rc = QW_STATUS_ERR_RESOURCE_LIMIT;
+            goto cleanup;
+        }
+    }
+    if (!qw_text_buffer_append(&output, "</div>\n</body>\n</tt>\n",
+                               strlen("</div>\n</body>\n</tt>\n"))) {
+        rc = QW_STATUS_ERR_OUT_OF_MEMORY;
+        goto cleanup;
+    }
+    *out_data = (uint8_t *)output.data;
+    *out_size = output.size;
+    if (report) {
+        (void)snprintf(report->note, sizeof(report->note),
+            "TTML output keeps cue begin/end times and text; styling, "
+            "regions, animation and metadata are dropped");
+        report->format = QW_FORMAT_TTML;
+    }
+    return QW_STATUS_OK;
+
+cleanup:
+    free(output.data);
+    return rc;
+}
+
+const QwSubtitleWriterDescriptor qw_writer_ttml_subtitle = {
+    QW_FORMAT_TTML,
+    "TTML timed-text writer",
+    ttml_write_document,
+    TTML_MAX_OUTPUT_BYTES
+};

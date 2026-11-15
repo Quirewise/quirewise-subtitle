@@ -74,7 +74,7 @@ void qw_subtitle_free(QwSubtitle *document);
 
 /*
  * Convert the parsed cue list to another supported subtitle format: SRT,
- * WebVTT, LRC, MicroDVD, SAMI, Scenarist SCC, ASS or SSA. Formats without a
+ * WebVTT, LRC, MicroDVD, SAMI, Scenarist SCC, ASS, SSA or TTML. Formats without a
  * writer return QW_SUBTITLE_UNSUPPORTED. The result is malloc-owned and must
  * be released with qw_subtitle_buffer_free(); it is not NUL-terminated.
  *

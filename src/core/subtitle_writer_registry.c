@@ -20,6 +20,7 @@ extern const QwSubtitleWriterDescriptor qw_writer_lrc_subtitle;
 extern const QwSubtitleWriterDescriptor qw_writer_sub_subtitle;
 extern const QwSubtitleWriterDescriptor qw_writer_sami_subtitle;
 extern const QwSubtitleWriterDescriptor qw_writer_scc_subtitle;
+extern const QwSubtitleWriterDescriptor qw_writer_ttml_subtitle;
 extern const QwSubtitleWriterDescriptor qw_writer_ass_subtitle;
 extern const QwSubtitleWriterDescriptor qw_writer_ssa_subtitle;
 
@@ -30,6 +31,7 @@ static const QwSubtitleWriterDescriptor *const qw_subtitle_writer_table[] = {
     &qw_writer_sub_subtitle,
     &qw_writer_sami_subtitle,
     &qw_writer_scc_subtitle,
+    &qw_writer_ttml_subtitle,
     &qw_writer_ass_subtitle,
     &qw_writer_ssa_subtitle
 };

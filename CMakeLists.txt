@@ -55,7 +55,15 @@ if(BUILD_TESTING)
     target_link_libraries(quirewise_subtitle_ttml_parse PRIVATE Quirewise::Subtitle)
     add_test(NAME quirewise_subtitle_ttml COMMAND quirewise_subtitle_ttml_parse)
 
-    add_executable(quirewise_subtitle_write_test tests/subtitle_write_test.c)
+    add_executable(quirewise_subtitle_ttml_write_test
+    tests/subtitle_ttml_write_test.c)
+target_compile_features(quirewise_subtitle_ttml_write_test PRIVATE c_std_11)
+target_link_libraries(quirewise_subtitle_ttml_write_test PRIVATE
+    quirewise_subtitle)
+add_test(NAME quirewise_subtitle_ttml_write
+    COMMAND quirewise_subtitle_ttml_write_test)
+
+add_executable(quirewise_subtitle_write_test tests/subtitle_write_test.c)
     target_compile_features(quirewise_subtitle_write_test PRIVATE c_std_11)
     target_link_libraries(quirewise_subtitle_write_test PRIVATE Quirewise::Subtitle)
     add_test(NAME quirewise_subtitle_write COMMAND quirewise_subtitle_write_test)
