@@ -4,6 +4,8 @@
 #include "subtitle_document.h"
 #include "quirewise/format.h"
 
+#include "../../core/writer_registry.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -181,4 +183,23 @@ const char *qw_subtitle_format_name(QwSubtitleInputFormat input_format)
     if ((unsigned)input_format >= sizeof(names) / sizeof(names[0]))
         return "unknown";
     return names[(unsigned)input_format];
+}
+
+QwSubtitleStatus qw_subtitle_write(const QwSubtitle *document,
+                                   QwOutputFormat output_format,
+                                   const QwConvertOptions *options,
+                                   uint8_t **out_data, size_t *out_size,
+                                   QwConvertReport *report)
+{
+    if (!document || !out_data || !out_size) return QW_SUBTITLE_INVALID_ARGUMENT;
+    *out_data = NULL;
+    *out_size = 0u;
+    return subtitle_status_map(qw_write_subtitle_document_to_format(
+        &document->internal, output_format, options, out_data, out_size,
+        report));
+}
+
+void qw_subtitle_buffer_free(void *buffer)
+{
+    free(buffer);
 }

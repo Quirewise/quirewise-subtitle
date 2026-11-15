@@ -1,7 +1,7 @@
 # quirewise-subtitle
 
 Parse SRT, WebVTT, LRC, MicroDVD, TTML, ASS/SSA, SAMI and SCC subtitles into one
-timed-cue model. Read-only: this package has no writer.
+timed-cue model, and write eight of the nine dialects back out.
 
 `Quirewise::Subtitle` is an independent, MIT-licensed C11 library, installed as
 the `QuirewiseSubtitle` CMake package (target `Quirewise::Subtitle`). It can be
@@ -19,11 +19,17 @@ consumed without the Quirewise application.
 - Keeps source-specific detail where the shared model has a slot for it: SRT
   cue numbers, WebVTT cue identifiers and settings, TTML `xml:id`, ASS dialogue
   text with line breaks.
+- Writes SRT, WebVTT, LRC, MicroDVD, ASS, SSA, SAMI and SCC from the parsed cue
+  list with `qw_subtitle_write`; the malloc-owned buffer is released with
+  `qw_subtitle_buffer_free`. Cue text round-trips; target formats that cannot
+  express a source feature (per-cue settings, explicit end times, sub-second
+  precision) drop it and say so in the report note.
 
-It does **not** write, render or convert subtitles. There is no public writer,
-no styling/positioning model, no font or color handling, no bitmap (PGS/VobSub)
-support and no video/audio processing. Source styles, positioning, speakers,
-layers, margins, effects and most header metadata are flattened or dropped.
+It does **not** write TTML, render or play subtitles, and has no styling or
+positioning model, no font or color handling, no bitmap (PGS/VobSub) support
+and no video/audio processing. Source styles, positioning, speakers, layers,
+margins, effects and most header metadata are flattened or dropped on the way
+in, so writers cannot restore them.
 
 ## Requirements
 

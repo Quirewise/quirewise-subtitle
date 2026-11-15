@@ -1,6 +1,8 @@
 #ifndef QUIREWISE_SUBTITLE_H
 #define QUIREWISE_SUBTITLE_H
 
+#include "quirewise/format.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -69,6 +71,24 @@ QwSubtitleStatus qw_subtitle_get_cue(const QwSubtitle *document,
                                      QwSubtitleCueView *out_cue);
 
 void qw_subtitle_free(QwSubtitle *document);
+
+/*
+ * Convert the parsed cue list to another supported subtitle format: SRT,
+ * WebVTT, LRC, MicroDVD, SAMI, Scenarist SCC, ASS or SSA. Formats without a
+ * writer return QW_SUBTITLE_UNSUPPORTED. The result is malloc-owned and must
+ * be released with qw_subtitle_buffer_free(); it is not NUL-terminated.
+ *
+ * Cue features the target format cannot express (per-cue settings, explicit
+ * end times, sub-second precision) are dropped and reported in the note.
+ */
+QwSubtitleStatus qw_subtitle_write(const QwSubtitle *document,
+                                   QwOutputFormat output_format,
+                                   const QwConvertOptions *options,
+                                   uint8_t **out_data, size_t *out_size,
+                                   QwConvertReport *report);
+
+/* Release a buffer returned by qw_subtitle_write(). NULL is accepted. */
+void qw_subtitle_buffer_free(void *buffer);
 
 const char *qw_subtitle_format_name(QwSubtitleInputFormat input_format);
 
