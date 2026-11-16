@@ -23,9 +23,11 @@ typedef struct AssEventFormat {
     size_t start_index;
     size_t end_index;
     size_t text_index;
+    size_t name_index;
     int has_start;
     int has_end;
     int has_text;
+    int has_name;
 } AssEventFormat;
 
 typedef struct AssLine {
@@ -229,6 +231,10 @@ static int ass_parse_format(const uint8_t *data, size_t size,
             if (parsed.has_text) return 0;
             parsed.text_index = parsed.field_count;
             parsed.has_text = 1;
+        } else if (ass_equal_ascii(field.data, field.size, "name")) {
+            if (parsed.has_name) return 0;
+            parsed.name_index = parsed.field_count;
+            parsed.has_name = 1;
         }
         ++parsed.field_count;
         if (end == size) break;
@@ -384,8 +390,19 @@ static int ass_parse_dialogue(const uint8_t *data, size_t size,
         free(text.data);
         return 1;
     }
-    added = qw_subtitle_document_add_cue(document, start_ms, end_ms, 1,
-                NULL, 0u, NULL, 0u, (const uint8_t *)text.data, text.size);
+    {
+        const uint8_t *name = NULL;
+        size_t name_size = 0u;
+        if (format->has_name && format->name_index < format->field_count) {
+            name = fields[format->name_index].data;
+            name_size = fields[format->name_index].size;
+            if (name_size > QW_SUBTITLE_MAX_IDENTIFIER_BYTES)
+                name_size = QW_SUBTITLE_MAX_IDENTIFIER_BYTES;
+        }
+        added = qw_subtitle_document_add_cue(document, start_ms, end_ms, 1,
+                    name, name_size, NULL, 0u,
+                    (const uint8_t *)text.data, text.size);
+    }
     free(text.data);
     if (!added) {
         *out_error = document->cue_count >= QW_SUBTITLE_MAX_CUES
@@ -511,7 +528,8 @@ int qw_subtitle_parse_ass_document(const void *input, size_t input_size,
     }
     if (report) {
         (void)snprintf(report->note, sizeof(report->note),
-            "%s dialogue times and plain text read; styles, positioning, names, margins, layers and effects are flattened%s",
+            "%s dialogue times and plain text read; speaker names kept as cue identifiers; "
+            "styles, positioning, margins, layers and effects are flattened%s",
             input_format == QW_FORMAT_ASS ? "ASS" : "SSA",
             empty_dialogues ? "; empty dialogue events are omitted" : "");
     }
@@ -697,14 +715,36 @@ static int ass_write_document(const QwSubtitleDocument *document,
             !ass_append(&output, ",", 1u, &error) ||
             !ass_append_time(&output, cue->end_milliseconds, &error,
                              &precision_lost) ||
-            !ass_append(&output, event_fields, sizeof(event_fields) - 1u,
-                        &error)) goto cleanup;
+            !ass_append(&output, ",Default,", 9u, &error)) goto cleanup;
+        {
+            const uint8_t *name = cue->identifier_utf8;
+            size_t name_size = cue->identifier_size;
+            size_t name_index;
+            int name_safe = 1;
+            int name_is_speaker =
+                document->input_format == QW_FORMAT_ASS ||
+                document->input_format == QW_FORMAT_SSA;
+            if (!name_is_speaker) name_size = 0u;
+            for (name_index = 0u; name_index < name_size; ++name_index) {
+                if (name[name_index] == ',' || name[name_index] == '\n' ||
+                    name[name_index] == '\r') {
+                    name_safe = 0;
+                    break;
+                }
+            }
+            if (name_safe && name_size &&
+                !ass_append(&output, (const char *)name, name_size, &error))
+                goto cleanup;
+            if (!ass_append(&output, ",0,0,0,,", 8u, &error)) goto cleanup;
+            if (cue->identifier_size && !name_is_speaker) metadata_dropped = 1;
+            if (name_size && !name_safe) metadata_dropped = 1;
+        }
         if (!ass_append_text(&output, cue->text_utf8, cue->text_size, &error)) {
             if (error == QW_STATUS_ERR_UNSUPPORTED) literal_ass_escape_rejected = 1;
             goto cleanup;
         }
         if (!ass_append(&output, "\n", 1u, &error)) goto cleanup;
-        if (cue->identifier_size || cue->settings_size) metadata_dropped = 1;
+        if (cue->settings_size) metadata_dropped = 1;
         if (!cue->end_time_explicit) inferred_end_written = 1;
     }
     *out_data = (uint8_t *)output.data;
@@ -712,9 +752,10 @@ static int ass_write_document(const QwSubtitleDocument *document,
     output.data = NULL;
     if (report) {
         (void)snprintf(report->note, sizeof(report->note),
-            "%s output keeps cue timing and plain text; styles, positioning, names, margins, layers and effects are omitted%s%s%s",
+            "%s output keeps cue timing, plain text and speaker names (Name field); "
+            "styles, positioning, margins, layers and effects are omitted%s%s%s",
             output_format == QW_FORMAT_ASS ? "ASS" : "SSA",
-            metadata_dropped ? "; source cue identifiers and settings are omitted" : "",
+            metadata_dropped ? "; unsafe speaker names and cue settings are omitted" : "",
             precision_lost ? "; timestamps rounded to centiseconds" : "",
             inferred_end_written ? "; inferred cue ends are written as explicit times" : "");
     }
