@@ -24,10 +24,20 @@ typedef struct AssEventFormat {
     size_t end_index;
     size_t text_index;
     size_t name_index;
+    size_t layer_index;
+    size_t margin_l_index;
+    size_t margin_r_index;
+    size_t margin_v_index;
+    size_t effect_index;
     int has_start;
     int has_end;
     int has_text;
     int has_name;
+    int has_layer;
+    int has_margin_l;
+    int has_margin_r;
+    int has_margin_v;
+    int has_effect;
 } AssEventFormat;
 
 typedef struct AssLine {
@@ -235,6 +245,26 @@ static int ass_parse_format(const uint8_t *data, size_t size,
             if (parsed.has_name) return 0;
             parsed.name_index = parsed.field_count;
             parsed.has_name = 1;
+        } else if (ass_equal_ascii(field.data, field.size, "layer")) {
+            if (parsed.has_layer) return 0;
+            parsed.layer_index = parsed.field_count;
+            parsed.has_layer = 1;
+        } else if (ass_equal_ascii(field.data, field.size, "marginl")) {
+            if (parsed.has_margin_l) return 0;
+            parsed.margin_l_index = parsed.field_count;
+            parsed.has_margin_l = 1;
+        } else if (ass_equal_ascii(field.data, field.size, "marginr")) {
+            if (parsed.has_margin_r) return 0;
+            parsed.margin_r_index = parsed.field_count;
+            parsed.has_margin_r = 1;
+        } else if (ass_equal_ascii(field.data, field.size, "marginv")) {
+            if (parsed.has_margin_v) return 0;
+            parsed.margin_v_index = parsed.field_count;
+            parsed.has_margin_v = 1;
+        } else if (ass_equal_ascii(field.data, field.size, "effect")) {
+            if (parsed.has_effect) return 0;
+            parsed.effect_index = parsed.field_count;
+            parsed.has_effect = 1;
         }
         ++parsed.field_count;
         if (end == size) break;
@@ -359,6 +389,31 @@ static int ass_decode_text(const uint8_t *data, size_t size, unsigned wrap_style
     return 1;
 }
 
+static int ass_field_number(const AssSlice *fields, size_t index,
+                            int present, unsigned long long *out_value)
+{
+    unsigned long long value = 0u;
+    size_t i;
+    if (!out_value) return 0;
+    if (!present || !fields || index >= ASS_MAX_EVENT_FIELDS) {
+        *out_value = 0u;
+        return 1;
+    }
+    if (!fields[index].size) {
+        *out_value = 0u;
+        return 1;
+    }
+    for (i = 0u; i < fields[index].size; ++i) {
+        unsigned char ch = fields[index].data[i];
+        if (ch < '0' || ch > '9') return 0;
+        if (value > (18446744073709551615ull - (ch - '0')) / 10u)
+            return 0;
+        value = value * 10u + (unsigned)(ch - '0');
+    }
+    *out_value = value;
+    return 1;
+}
+
 static int ass_parse_dialogue(const uint8_t *data, size_t size,
                               const AssEventFormat *format,
                               unsigned wrap_style,
@@ -393,15 +448,55 @@ static int ass_parse_dialogue(const uint8_t *data, size_t size,
     {
         const uint8_t *name = NULL;
         size_t name_size = 0u;
+        QwTextBuffer settings = {0};
+        unsigned long long layer = 0u;
+        unsigned long long margin_l = 0u;
+        unsigned long long margin_r = 0u;
+        unsigned long long margin_v = 0u;
+        char header[160];
+        int header_size;
         if (format->has_name && format->name_index < format->field_count) {
             name = fields[format->name_index].data;
             name_size = fields[format->name_index].size;
             if (name_size > QW_SUBTITLE_MAX_IDENTIFIER_BYTES)
                 name_size = QW_SUBTITLE_MAX_IDENTIFIER_BYTES;
         }
+        if (!ass_field_number(fields, format->layer_index, format->has_layer,
+                              &layer) ||
+            !ass_field_number(fields, format->margin_l_index,
+                              format->has_margin_l, &margin_l) ||
+            !ass_field_number(fields, format->margin_r_index,
+                              format->has_margin_r, &margin_r) ||
+            !ass_field_number(fields, format->margin_v_index,
+                              format->has_margin_v, &margin_v)) {
+            free(text.data);
+            *out_error = QW_STATUS_ERR_FORMAT;
+            return 0;
+        }
+        settings.limit = QW_SUBTITLE_MAX_SETTINGS_BYTES + 1u;
+        header_size = snprintf(header, sizeof(header), "%llu|%llu|%llu|%llu|",
+                               layer, margin_l, margin_r, margin_v);
+        if (header_size <= 0 || (size_t)header_size >= sizeof(header) ||
+            !qw_text_buffer_append(&settings, header, (size_t)header_size)) {
+            free(text.data);
+            *out_error = QW_STATUS_ERR_OUT_OF_MEMORY;
+            return 0;
+        }
+        if (format->has_effect && format->effect_index < format->field_count &&
+            fields[format->effect_index].size &&
+            !qw_text_buffer_append(&settings,
+                (const char *)fields[format->effect_index].data,
+                fields[format->effect_index].size)) {
+            free(settings.data);
+            free(text.data);
+            *out_error = QW_STATUS_ERR_RESOURCE_LIMIT;
+            return 0;
+        }
         added = qw_subtitle_document_add_cue(document, start_ms, end_ms, 1,
-                    name, name_size, NULL, 0u,
+                    name, name_size,
+                    (const uint8_t *)settings.data, settings.size,
                     (const uint8_t *)text.data, text.size);
+        free(settings.data);
     }
     free(text.data);
     if (!added) {
@@ -681,9 +776,8 @@ static int ass_write_document(const QwSubtitleDocument *document,
         "&H80000000,0,0,1,2,0,2,10,10,10,0,1\n\n[Events]\n"
         "Format: Marked, Start, End, Style, Name, MarginL, MarginR, "
         "MarginV, Effect, Text\n";
-    static const char ass_event_prefix[] = "Dialogue: 0,";
+    static const char ass_event_prefix[] = "Dialogue: ";
     static const char ssa_event_prefix[] = "Dialogue: Marked=0,";
-    static const char event_fields[] = ",Default,,0,0,0,,";
     QwTextBuffer output = {0};
     int error = QW_STATUS_OK;
     int precision_lost = 0;
@@ -705,12 +799,60 @@ static int ass_write_document(const QwSubtitleDocument *document,
                            &error)) goto cleanup;
     for (i = 0u; i < document->cue_count; ++i) {
         const QwSubtitleCue *cue = &document->cues[i];
-        const char *prefix = output_format == QW_FORMAT_ASS
-            ? ass_event_prefix : ssa_event_prefix;
-        size_t prefix_size = output_format == QW_FORMAT_ASS
-            ? sizeof(ass_event_prefix) - 1u : sizeof(ssa_event_prefix) - 1u;
-        if (!ass_append(&output, prefix, prefix_size, &error) ||
-            !ass_append_time(&output, cue->start_milliseconds, &error,
+        unsigned long long layer = 0u;
+        unsigned long long margin_l = 0u;
+        unsigned long long margin_r = 0u;
+        unsigned long long margin_v = 0u;
+        const char *effect = "";
+        size_t effect_size = 0u;
+        int settings_valid = 0;
+        int input_ass = document->input_format == QW_FORMAT_ASS ||
+                        document->input_format == QW_FORMAT_SSA;
+        if (input_ass && cue->settings_size &&
+            cue->settings_size <= QW_SUBTITLE_MAX_SETTINGS_BYTES) {
+            char settings[QW_SUBTITLE_MAX_SETTINGS_BYTES + 1u];
+            char *cursor;
+            char *end;
+            int fields_ok = 1;
+            memcpy(settings, cue->settings_utf8, cue->settings_size);
+            settings[cue->settings_size] = '\0';
+            cursor = settings;
+            layer = strtoull(cursor, &end, 10);
+            if (end == cursor || *end != '|') fields_ok = 0;
+            if (fields_ok) { cursor = end + 1;
+                margin_l = strtoull(cursor, &end, 10);
+                if (end == cursor || *end != '|') fields_ok = 0; }
+            if (fields_ok) { cursor = end + 1;
+                margin_r = strtoull(cursor, &end, 10);
+                if (end == cursor || *end != '|') fields_ok = 0; }
+            if (fields_ok) { cursor = end + 1;
+                margin_v = strtoull(cursor, &end, 10);
+                if (end == cursor || *end != '|') fields_ok = 0; }
+            if (fields_ok) {
+                effect = end + 1;
+                effect_size = strlen(effect);
+                settings_valid = 1;
+            }
+        }
+        {
+            char layer_text[32];
+            int layer_size;
+            if (output_format == QW_FORMAT_ASS) {
+                layer_size = snprintf(layer_text, sizeof(layer_text),
+                                      "%llu,", layer);
+                if (layer_size <= 0 ||
+                    (size_t)layer_size >= sizeof(layer_text) ||
+                    !ass_append(&output, ass_event_prefix,
+                                sizeof(ass_event_prefix) - 1u, &error) ||
+                    !ass_append(&output, layer_text, (size_t)layer_size,
+                                &error))
+                    goto cleanup;
+            } else if (!ass_append(&output, ssa_event_prefix,
+                                   sizeof(ssa_event_prefix) - 1u, &error)) {
+                goto cleanup;
+            }
+        }
+        if (!ass_append_time(&output, cue->start_milliseconds, &error,
                              &precision_lost) ||
             !ass_append(&output, ",", 1u, &error) ||
             !ass_append_time(&output, cue->end_milliseconds, &error,
@@ -735,7 +877,37 @@ static int ass_write_document(const QwSubtitleDocument *document,
             if (name_safe && name_size &&
                 !ass_append(&output, (const char *)name, name_size, &error))
                 goto cleanup;
-            if (!ass_append(&output, ",0,0,0,,", 8u, &error)) goto cleanup;
+            {
+                char margins[96];
+                int margins_size;
+                int effect_safe = 1;
+                size_t effect_index;
+                if (!settings_valid && input_ass && cue->settings_size)
+                    metadata_dropped = 1;
+                for (effect_index = 0u; effect_index < effect_size;
+                     ++effect_index) {
+                    if (effect[effect_index] == ',' ||
+                        effect[effect_index] == '\n' ||
+                        effect[effect_index] == '\r') {
+                        effect_safe = 0;
+                        break;
+                    }
+                }
+                if (!effect_safe) {
+                    effect = "";
+                    effect_size = 0u;
+                    metadata_dropped = 1;
+                }
+                margins_size = snprintf(margins, sizeof(margins),
+                                        ",%llu,%llu,%llu,%.*s,", margin_l,
+                                        margin_r, margin_v, (int)effect_size,
+                                        effect);
+                if (margins_size <= 0 ||
+                    (size_t)margins_size >= sizeof(margins) ||
+                    !ass_append(&output, margins, (size_t)margins_size,
+                                &error))
+                    goto cleanup;
+            }
             if (cue->identifier_size && !name_is_speaker) metadata_dropped = 1;
             if (name_size && !name_safe) metadata_dropped = 1;
         }
@@ -744,7 +916,7 @@ static int ass_write_document(const QwSubtitleDocument *document,
             goto cleanup;
         }
         if (!ass_append(&output, "\n", 1u, &error)) goto cleanup;
-        if (cue->settings_size) metadata_dropped = 1;
+        
         if (!cue->end_time_explicit) inferred_end_written = 1;
     }
     *out_data = (uint8_t *)output.data;
@@ -753,7 +925,7 @@ static int ass_write_document(const QwSubtitleDocument *document,
     if (report) {
         (void)snprintf(report->note, sizeof(report->note),
             "%s output keeps cue timing, plain text and speaker names (Name field); "
-            "styles, positioning, margins, layers and effects are omitted%s%s%s",
+            "styles and positioning are omitted; layer, margins and effects are kept for ASS/SSA sources%s%s%s",
             output_format == QW_FORMAT_ASS ? "ASS" : "SSA",
             metadata_dropped ? "; unsafe speaker names and cue settings are omitted" : "",
             precision_lost ? "; timestamps rounded to centiseconds" : "",

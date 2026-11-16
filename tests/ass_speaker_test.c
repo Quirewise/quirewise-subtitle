@@ -13,7 +13,7 @@ static const char ass[] =
     "[Events]\n"
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
     "Effect, Text\n"
-    "Dialogue: 0,0:00:01.00,0:00:02.00,Default,Alice,0,0,0,,Hello\n"
+    "Dialogue: 2,0:00:01.00,0:00:02.00,Default,Alice,10,20,30,Fade,Hello\n"
     "Dialogue: 0,0:00:03.00,0:00:04.00,Default,Bob,0,0,0,,Hi\n";
 
 static int contains(const uint8_t *data, size_t size, const char *needle)
@@ -59,7 +59,8 @@ int main(void)
         qw_subtitle_free(document);
         return 1;
     }
-    if (!contains(output, output_size, ",Default,Alice,0,0,0,,") ||
+    if (!contains(output, output_size, "Dialogue: 2,") ||
+        !contains(output, output_size, ",Default,Alice,10,20,30,Fade,") ||
         !contains(output, output_size, ",Default,Bob,0,0,0,,")) {
         fputs("FAIL: ASS speaker names were not written back\n", stderr);
         qw_subtitle_buffer_free(output);
