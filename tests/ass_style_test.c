@@ -14,7 +14,7 @@ static const char ass[] =
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
     "Effect, Text\n"
     "Dialogue: 0,0:00:01.00,0:00:02.00,Default,Alice,0,0,0,,"
-    "{\\i1}Hello{\\i0} world\n";
+    "{\\pos(100,200)\\i1}Hello{\\i0} world\n";
 
 static int contains(const uint8_t *data, size_t size, const char *needle)
 {
@@ -59,7 +59,7 @@ int main(void)
         qw_subtitle_free(document);
         return 1;
     }
-    if (!contains(output, output_size, "{\\i1}Hello{\\i0} world")) {
+    if (!contains(output, output_size, "{\\pos(100,200)\\i1}Hello{\\i0} world")) {
         fputs("FAIL: ASS override tags were not written back\n", stderr);
         qw_subtitle_buffer_free(output);
         qw_subtitle_free(document);
