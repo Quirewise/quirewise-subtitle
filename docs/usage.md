@@ -166,7 +166,18 @@ if (qw_subtitle_get_cue(document, 0u, &cue) == QW_SUBTITLE_OK) {
 
 `settings` is the raw remainder of the timing line (for example
 `line:90% align:start`); this package does not interpret positioning
-directives.
+directives. For ASS/SSA it carries `layer|ml|mr|mv|effect` values, and a
+`|RAW:` suffix preserves the original override tags so ASS/SSA→ASS/SSA can
+restore them.
+
+## 6.1 Write a subtitle
+
+`qw_subtitle_write(document, format, &data, &size, &report)` emits SRT,
+WebVTT, LRC, MicroDVD, TTML, ASS, SSA, SAMI or SCC. TTML output contains cue
+begin/end and escaped text, not styling/regions/metadata. Release the result
+with `qw_subtitle_buffer_free`. A target that cannot represent a cue
+feature drops it and describes the loss in `report.note`; the output buffer is
+still valid.
 
 ## 7. Status handling
 
@@ -218,13 +229,14 @@ Per-format behavior:
 | WebVTT | requires a `WEBVTT` header; accepts `HH:MM:SS.mmm` and `MM:SS.mmm`; settings kept verbatim; `NOTE`/`STYLE`/`REGION` dropped |
 | LRC | `[mm:ss.xx]` timestamps, several per line produce several cues; metadata tags skipped; ends inferred as `start + 5 s` |
 | MicroDVD | `{start}{end}text`, pipe becomes `\n`; fps header searched in the first three non-empty lines; default 23.976 |
-| TTML | `<tt>` root, `begin` plus `end`/`dur`, clock, offset and frame times; `<br/>` becomes `\n`, nested `<span>` merged; styles/regions dropped |
-| ASS/SSA | `[Script Info]` version checked; `Dialogue:` fields read; `\N` becomes a newline, `\n` a space, `\h` a no-break space, override tags dropped; vector drawings unsupported |
+| TTML | `<tt>` root, `begin` plus `end`/`dur`, clock, offset and frame times; `<br/>` becomes `\n`, nested `<span>` merged; styles/regions dropped; writer emits begin/end and escaped text only |
+| ASS/SSA | `[Script Info]` version checked; `Dialogue:` fields read; `\N` becomes a newline, `\n` a space, `\h` a no-break space; speaker/layer/margins/effect and raw override tags preserved for ASS/SSA direct round-trip; vector drawings unsupported |
 | SAMI | first caption class selected; `<SYNC Start=...>` timing; HTML flattened; inferred ends |
 | SCC | `Scenarist_SCC V1.0` header required; CC1 pop-on subset; 33 ms frame quantum; row placement flattened |
 
-There is no bitmap subtitle support (PGS, VobSub) and no styling model: color,
-font, position, speaker, layer and effect information is discarded.
+There is no bitmap subtitle support (PGS, VobSub) and no font/color model.
+Cross-format conversion flattens positioning and styling; only ASS/SSA→ASS/SSA
+round-trip preserves the speaker, layer/margins/effect and raw override tags.
 
 ## 10. Related packages
 

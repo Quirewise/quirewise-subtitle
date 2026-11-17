@@ -1,7 +1,7 @@
 # quirewise-subtitle
 
 Parse SRT, WebVTT, LRC, MicroDVD, TTML, ASS/SSA, SAMI and SCC subtitles into one
-timed-cue model, and write eight of the nine dialects back out.
+timed-cue model, and write all nine dialects back out.
 
 `Quirewise::Subtitle` is an independent, MIT-licensed C11 library, installed as
 the `QuirewiseSubtitle` CMake package (target `Quirewise::Subtitle`). It can be
@@ -17,19 +17,24 @@ consumed without the Quirewise application.
 - Reports the cue count and, for MicroDVD, the source frame rate as a reduced
   rational (`frame_rate_num` / `frame_rate_den`).
 - Keeps source-specific detail where the shared model has a slot for it: SRT
-  cue numbers, WebVTT cue identifiers and settings, TTML `xml:id`, ASS dialogue
-  text with line breaks.
-- Writes SRT, WebVTT, LRC, MicroDVD, ASS, SSA, SAMI and SCC from the parsed cue
-  list with `qw_subtitle_write`; the malloc-owned buffer is released with
-  `qw_subtitle_buffer_free`. Cue text round-trips; target formats that cannot
-  express a source feature (per-cue settings, explicit end times, sub-second
-  precision) drop it and say so in the report note.
+  cue numbers, WebVTT cue identifiers and settings, TTML `xml:id`, ASS/SSA
+  speaker names, layer/margins/effect in cue settings, dialogue line breaks and
+  raw override tags (`{\i1}`, `{\pos(...)}`, ...) preserved after a `|RAW:`
+  marker.
+- Writes SRT, WebVTT, LRC, MicroDVD, TTML, ASS, SSA, SAMI and SCC from the parsed
+  cue list with `qw_subtitle_write`; the malloc-owned buffer is released with
+  `qw_subtitle_buffer_free`. Cue text round-trips; ASS/SSA output restores the
+  speaker, layer/margins/effect and raw override tags when they came from
+  ASS/SSA. Target formats that cannot express a source feature (per-cue
+  settings, explicit end times, sub-second precision) drop it and say so in the
+  report note.
 
-It does **not** write TTML, render or play subtitles, and has no styling or
-positioning model, no font or color handling, no bitmap (PGS/VobSub) support
-and no video/audio processing. Source styles, positioning, speakers, layers,
-margins, effects and most header metadata are flattened or dropped on the way
-in, so writers cannot restore them.
+TTML output carries cue begin/end and escaped text only. The package does
+**not** render or play subtitles, and has no font/color or bitmap (PGS/VobSub)
+model and no video/audio processing. Cross-format
+conversion flattens ASS/SSA styling and positioning; only ASS/SSA-to-ASS/SSA
+preserves the raw override tags and cue settings described above. Most header
+metadata is still dropped.
 
 ## Requirements
 
