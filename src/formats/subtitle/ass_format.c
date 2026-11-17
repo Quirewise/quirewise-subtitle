@@ -492,6 +492,18 @@ static int ass_parse_dialogue(const uint8_t *data, size_t size,
             *out_error = QW_STATUS_ERR_RESOURCE_LIMIT;
             return 0;
         }
+        if (format->has_text && format->text_index < format->field_count &&
+            fields[format->text_index].size <= 3000u) {
+            if (!qw_text_buffer_append(&settings, "|RAW:", 5u) ||
+                !qw_text_buffer_append(&settings,
+                    (const char *)fields[format->text_index].data,
+                    fields[format->text_index].size)) {
+                free(settings.data);
+                free(text.data);
+                *out_error = QW_STATUS_ERR_RESOURCE_LIMIT;
+                return 0;
+            }
+        }
         added = qw_subtitle_document_add_cue(document, start_ms, end_ms, 1,
                     name, name_size,
                     (const uint8_t *)settings.data, settings.size,
@@ -804,7 +816,9 @@ static int ass_write_document(const QwSubtitleDocument *document,
         unsigned long long margin_r = 0u;
         unsigned long long margin_v = 0u;
         const char *effect = "";
+        const char *raw_text = NULL;
         size_t effect_size = 0u;
+        size_t raw_size = 0u;
         int settings_valid = 0;
         int input_ass = document->input_format == QW_FORMAT_ASS ||
                         document->input_format == QW_FORMAT_SSA;
@@ -831,6 +845,14 @@ static int ass_write_document(const QwSubtitleDocument *document,
             if (fields_ok) {
                 effect = end + 1;
                 effect_size = strlen(effect);
+                {
+                    const char *raw = strstr(effect, "|RAW:");
+                    if (raw) {
+                        effect_size = (size_t)(raw - effect);
+                        raw_text = raw + 5;
+                        raw_size = strlen(raw_text);
+                    }
+                }
                 settings_valid = 1;
             }
         }
@@ -911,7 +933,10 @@ static int ass_write_document(const QwSubtitleDocument *document,
             if (cue->identifier_size && !name_is_speaker) metadata_dropped = 1;
             if (name_size && !name_safe) metadata_dropped = 1;
         }
-        if (!ass_append_text(&output, cue->text_utf8, cue->text_size, &error)) {
+        if (raw_text && raw_size) {
+            if (!ass_append(&output, raw_text, raw_size, &error)) goto cleanup;
+        } else if (!ass_append_text(&output, cue->text_utf8, cue->text_size,
+                                    &error)) {
             if (error == QW_STATUS_ERR_UNSUPPORTED) literal_ass_escape_rejected = 1;
             goto cleanup;
         }

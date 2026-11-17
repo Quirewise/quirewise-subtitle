@@ -68,7 +68,13 @@ add_executable(quirewise_subtitle_write_test tests/subtitle_write_test.c)
     target_link_libraries(quirewise_subtitle_write_test PRIVATE Quirewise::Subtitle)
     add_test(NAME quirewise_subtitle_write COMMAND quirewise_subtitle_write_test)
 
-    add_executable(quirewise_subtitle_ass_speaker tests/ass_speaker_test.c)
+    add_executable(quirewise_subtitle_ass_style tests/ass_style_test.c)
+    target_compile_features(quirewise_subtitle_ass_style PRIVATE c_std_11)
+    target_link_libraries(quirewise_subtitle_ass_style PRIVATE Quirewise::Subtitle)
+    add_test(NAME quirewise_subtitle_ass_style
+        COMMAND quirewise_subtitle_ass_style)
+
+add_executable(quirewise_subtitle_ass_speaker tests/ass_speaker_test.c)
     target_compile_features(quirewise_subtitle_ass_speaker PRIVATE c_std_11)
     target_link_libraries(quirewise_subtitle_ass_speaker PRIVATE Quirewise::Subtitle)
     add_test(NAME quirewise_subtitle_ass_speaker
