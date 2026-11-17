@@ -62,6 +62,7 @@ QwSubtitleStatus qw_subtitle_parse(const void *data,
                                    QwSubtitleInputFormat input_format,
                                    QwSubtitle **out_document);
 
+/*! Fill format, cue count and timing metadata. */
 QwSubtitleStatus qw_subtitle_get_info(const QwSubtitle *document,
                                       QwSubtitleInfo *out_info);
 
@@ -70,6 +71,7 @@ QwSubtitleStatus qw_subtitle_get_cue(const QwSubtitle *document,
                                      size_t index,
                                      QwSubtitleCueView *out_cue);
 
+/*! Release a subtitle document; NULL is accepted. */
 void qw_subtitle_free(QwSubtitle *document);
 
 /*
@@ -90,6 +92,7 @@ QwSubtitleStatus qw_subtitle_write(const QwSubtitle *document,
 /* Release a buffer returned by qw_subtitle_write(). NULL is accepted. */
 void qw_subtitle_buffer_free(void *buffer);
 
+/*! Return a static name for an input format. */
 const char *qw_subtitle_format_name(QwSubtitleInputFormat input_format);
 
 #ifdef __cplusplus
