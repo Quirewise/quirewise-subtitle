@@ -405,7 +405,7 @@ static int ttml_collect_cue_text(const uint8_t *data, size_t size,
                                  size_t from, size_t *out_end,
                                  char **out_text, size_t *out_text_size)
 {
-    uint8_t *buffer;
+    uint8_t *buffer = NULL;
     size_t capacity = 0u;
     size_t used = 0u;
     size_t index = from;

@@ -820,11 +820,13 @@ static int ass_write_document(const QwSubtitleDocument *document,
         size_t effect_size = 0u;
         size_t raw_size = 0u;
         int settings_valid = 0;
+        /* The parsed effect and raw text point into this buffer, which must stay
+           in scope for the whole cue, not only for the parsing block. */
+        char settings[QW_SUBTITLE_MAX_SETTINGS_BYTES + 1u];
         int input_ass = document->input_format == QW_FORMAT_ASS ||
                         document->input_format == QW_FORMAT_SSA;
         if (input_ass && cue->settings_size &&
             cue->settings_size <= QW_SUBTITLE_MAX_SETTINGS_BYTES) {
-            char settings[QW_SUBTITLE_MAX_SETTINGS_BYTES + 1u];
             char *cursor;
             char *end;
             int fields_ok = 1;
